@@ -1,0 +1,30 @@
+{
+  "name": "squareexp/idp-laravel",
+  "description": "Laravel SDK for Square Experience Base IdP OAuth and PASETO v4.public verification.",
+  "type": "library",
+  "license": "UNLICENSED",
+  "require": {
+    "php": "^8.2",
+    "ext-sodium": "*",
+    "illuminate/contracts": "^10.0|^11.0|^12.0",
+    "illuminate/http": "^10.0|^11.0|^12.0",
+    "illuminate/support": "^10.0|^11.0|^12.0"
+  },
+  "autoload": {
+    "psr-4": {
+      "SquareExp\\IdpLaravel\\": "src/"
+    }
+  },
+  "extra": {
+    "laravel": {
+      "providers": [
+        "SquareExp\\IdpLaravel\\SquareIdpServiceProvider"
+      ],
+      "aliases": {
+        "SquareIdp": "SquareExp\\IdpLaravel\\Facades\\SquareIdp"
+      }
+    }
+  },
+  "minimum-stability": "stable",
+  "prefer-stable": true
+}

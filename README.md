@@ -1,0 +1,60 @@
+# squareexp/idp-laravel
+
+Laravel SDK for integrating with Base IDP.
+
+## Install
+
+```bash
+composer require squareexp/idp-laravel
+php artisan vendor:publish --tag=square-idp-config
+```
+
+## Required Environment
+
+```env
+BASE_IDP_ISSUER=https://authlayer.squareexp.com
+BASE_IDP_CLIENT_ID=<your-client-id>
+BASE_IDP_CLIENT_SECRET=<your-client-secret-if-confidential>
+BASE_IDP_REDIRECT_URI=<exact-registered-callback-url>
+BASE_IDP_SCOPES="openid profile <product>:read <product>:write"
+BASE_IDP_REQUIRED_SCOPE=<product>:read
+BASE_IDP_AUDIENCE=square-experience
+```
+
+Get these values from Base client registration.
+
+## Login Redirect Route
+
+```php
+use SquareExp\IdpLaravel\Http\Controllers\SquareLoginController;
+
+Route::get('/auth/square/login', SquareLoginController::class);
+```
+
+## Callback Route
+
+```php
+use SquareExp\IdpLaravel\Http\Controllers\SquareCallbackController;
+
+Route::get('/auth/square/callback', SquareCallbackController::class);
+```
+
+In production, create your own app session after callback handling.
+
+## Protect Routes with Scope
+
+```php
+Route::middleware('square.idp:crm:read')->get('/api/customers', function (\Illuminate\Http\Request $request) {
+    $principal = $request->attributes->get('square_principal');
+    return ['user' => $principal->id];
+});
+```
+
+## Direct Manager Usage
+
+```php
+use SquareExp\IdpLaravel\SquareIdpManager;
+
+$tokens = app(SquareIdpManager::class)->exchangeCode($code);
+$principal = app(SquareIdpManager::class)->verifyAccessToken($tokens['access_token'], 'crm:read');
+```
