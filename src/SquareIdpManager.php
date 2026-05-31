@@ -12,6 +12,8 @@ final class SquareIdpManager
     private const ACCESS_IMPLICIT = 'square-experience:idp:access:v1';
     private const HEADER = 'v4.public.';
 
+    private bool $resolved = false;
+
     public function __construct(
         private readonly array $config,
         private readonly HttpFactory $http,
@@ -19,8 +21,49 @@ final class SquareIdpManager
     ) {
     }
 
+    public function resolveConfig(): void
+    {
+        if ($this->resolved) return;
+        if (!empty($this->config['client_id'])) {
+            $this->resolved = true;
+            return;
+        }
+        if (empty($this->config['key'])) {
+            throw new SquareIdpException('invalid_config', 'base key is required (set BASE_IDP_KEY)');
+        }
+
+        $cacheKey = 'base-idp:client-config:' . sha1($this->config['key']);
+
+        $resolved = $this->cache->get($cacheKey);
+        if (!$resolved) {
+            $response = $this->http
+                ->acceptJson()
+                ->get($this->issuer() . '/v1/client-config', ['key' => $this->config['key']]);
+
+            if (!$response->successful()) {
+                throw new SquareIdpException(
+                    'config_discovery_failed',
+                    'base idp: config discovery failed',
+                    $response->status(),
+                    $response->json(),
+                );
+            }
+            $resolved = $response->json();
+            $this->cache->put($cacheKey, $resolved, max(60, (int) ($this->config['cache_ttl_seconds'] ?? 300)));
+        }
+
+        $this->config['issuer'] = rtrim($resolved['issuer'] ?? $this->issuer(), '/');
+        $this->config['client_id'] = $resolved['client_id'];
+        $this->config['redirect_uri'] = $this->config['redirect_uri'] ?? ($resolved['allowed_redirect_uris'][0] ?? '');
+        $this->config['scopes'] = $this->config['scopes'] ?? implode(' ', $resolved['allowed_scopes'] ?? ['openid', 'profile']);
+        $this->config['audience'] = $this->config['audience'] ?? 'square-experience';
+        $this->config['resolved_scopes'] = $resolved['allowed_scopes'] ?? [];
+        $this->resolved = true;
+    }
+
     public function authorizeUrl(array $options = []): string
     {
+        $this->resolveConfig();
         $query = [
             'response_type' => 'code',
             'client_id' => $this->requiredConfig('client_id'),
@@ -42,14 +85,15 @@ final class SquareIdpManager
 
     public function exchangeCode(string $code, ?string $codeVerifier = null): array
     {
+        $this->resolveConfig();
         $body = [
             'grant_type' => 'authorization_code',
             'code' => $code,
             'client_id' => $this->requiredConfig('client_id'),
             'redirect_uri' => $this->requiredConfig('redirect_uri'),
         ];
-        if (!empty($this->config['client_secret'])) {
-            $body['client_secret'] = $this->config['client_secret'];
+        if (!empty($this->config['secret'])) {
+            $body['client_secret'] = $this->config['secret'];
         }
         if ($codeVerifier) {
             $body['code_verifier'] = $codeVerifier;
@@ -59,13 +103,14 @@ final class SquareIdpManager
 
     public function refresh(string $refreshToken, array|string|null $scopes = null): array
     {
+        $this->resolveConfig();
         $body = [
             'grant_type' => 'refresh_token',
             'refresh_token' => $refreshToken,
             'client_id' => $this->requiredConfig('client_id'),
         ];
-        if (!empty($this->config['client_secret'])) {
-            $body['client_secret'] = $this->config['client_secret'];
+        if (!empty($this->config['secret'])) {
+            $body['client_secret'] = $this->config['secret'];
         }
         if ($scopes) {
             $body['scope'] = $this->scopeString($scopes);
@@ -117,7 +162,7 @@ final class SquareIdpManager
 
     public function publicKeys(bool $force = false): array
     {
-        $cacheKey = 'square-idp:paseto-v4-public:' . sha1($this->issuer());
+        $cacheKey = 'base-idp:paseto-v4-public:' . sha1($this->issuer());
         if (!$force && ($cached = $this->cache->get($cacheKey))) {
             return $cached;
         }
@@ -199,7 +244,7 @@ final class SquareIdpManager
     {
         $value = trim((string) ($this->config[$key] ?? ''));
         if ($value === '') {
-            throw new SquareIdpException('invalid_config', "Missing square-idp config value: {$key}");
+            throw new SquareIdpException('invalid_config', "Missing base idp config value: {$key}");
         }
         return $value;
     }

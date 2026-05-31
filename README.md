@@ -22,6 +22,7 @@ BASE_IDP_AUDIENCE=square-experience
 ```
 
 Get these values from Base client registration.
+Use `BASE_IDP_CLIENT_SECRET` for new projects; `BASE_IDP_SECRET` is kept as a legacy alias by older package versions.
 
 ## Login Redirect Route
 
