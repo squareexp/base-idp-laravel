@@ -1,0 +1,46 @@
+name: Release Base IdP Laravel SDK
+
+on:
+  push:
+    tags:
+      - 'sdk-v*'
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Build and publish Laravel SDK assets
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          tools: composer
+
+      - name: Validate composer manifest
+        run: composer validate --strict
+
+      - name: Pack source archive
+        run: |
+          set -euo pipefail
+          rm -rf release
+          mkdir -p release
+          tar -czf "release/base-idp-laravel-sdk-${GITHUB_REF_NAME}.tar.gz" \
+            --exclude=.git \
+            --exclude=release \
+            --exclude=vendor \
+            -C . .
+
+      - name: Upload GitHub Release assets
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          files: release/*.tar.gz
+          generate_release_notes: true
