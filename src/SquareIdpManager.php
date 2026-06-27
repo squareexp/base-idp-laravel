@@ -24,21 +24,24 @@ final class SquareIdpManager
     public function resolveConfig(): void
     {
         if ($this->resolved) return;
-        if (!empty($this->config['client_id'])) {
-            $this->resolved = true;
-            return;
-        }
-        if (empty($this->config['key'])) {
-            throw new SquareIdpException('invalid_config', 'base key is required (set BASE_IDP_KEY)');
+        if (empty($this->config['client_id']) && empty($this->config['key'])) {
+            throw new SquareIdpException('invalid_config', 'BASE_IDP_CLIENT_ID is required');
         }
 
-        $cacheKey = 'base-idp:client-config:' . sha1($this->config['key']);
+        $cacheKey = 'base-idp:client-config:' . sha1((string) ($this->config['client_id'] ?? $this->config['key']));
 
         $resolved = $this->cache->get($cacheKey);
         if (!$resolved) {
-            $response = $this->http
-                ->acceptJson()
-                ->get($this->issuer() . '/v1/client-config', ['key' => $this->config['key']]);
+            $request = $this->http->acceptJson();
+            if (!empty($this->config['client_id'])) {
+                $payload = ['client_id' => $this->config['client_id']];
+                if (!empty($this->config['secret'])) {
+                    $payload['secret'] = $this->config['secret'];
+                }
+                $response = $request->post($this->issuer() . '/v1/client-config', $payload);
+            } else {
+                $response = $request->get($this->issuer() . '/v1/client-config', ['key' => $this->config['key']]);
+            }
 
             if (!$response->successful()) {
                 throw new SquareIdpException(
@@ -54,6 +57,9 @@ final class SquareIdpManager
 
         $this->config['issuer'] = rtrim($resolved['issuer'] ?? $this->issuer(), '/');
         $this->config['client_id'] = $resolved['client_id'];
+        if (empty($this->config['key'])) {
+            $this->config['key'] = $resolved['client_id'];
+        }
         $this->config['redirect_uri'] = $this->config['redirect_uri'] ?? ($resolved['allowed_redirect_uris'][0] ?? '');
         $this->config['scopes'] = $this->config['scopes'] ?? implode(' ', $resolved['allowed_scopes'] ?? ['openid', 'profile']);
         $this->config['audience'] = $this->config['audience'] ?? 'square-experience';
@@ -251,7 +257,15 @@ final class SquareIdpManager
 
     private function issuer(): string
     {
-        return rtrim((string) ($this->config['issuer'] ?? 'https://authlayer.squareexp.com'), '/');
+        $issuer = trim((string) ($this->config['issuer'] ?? ''));
+        if ($issuer !== '') {
+            return rtrim($issuer, '/');
+        }
+        $env = strtolower(trim((string) env('APP_ENV', 'production')));
+        if (in_array($env, ['dev', 'development', 'local'], true)) {
+            return 'http://localhost:8080';
+        }
+        return 'https://authlayer.square.com';
     }
 
     private function scopeString(array|string $scopes): string

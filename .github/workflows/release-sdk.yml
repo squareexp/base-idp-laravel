@@ -13,6 +13,12 @@ jobs:
     name: Build and publish Laravel SDK assets
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    env:
+      CI_SMTP_HOST: ${{ secrets.CI_SMTP_HOST || secrets.SQUARE_MAIL_HOST }}
+      CI_SMTP_PORT: ${{ secrets.CI_SMTP_PORT || secrets.SMTP_SSL_PORT || '465' }}
+      CI_SMTP_USER: ${{ secrets.CI_SMTP_USER || secrets.SQUARE_MAILBOX_USER }}
+      CI_SMTP_PASS: ${{ secrets.CI_SMTP_PASS || secrets.SQUARE_MAIL_PASSWORD }}
+      CI_NOTIFY_EMAILS: ${{ secrets.CI_NOTIFY_EMAILS || secrets.SQUARE_MAIL_FROM }}
 
     steps:
       - name: Checkout
@@ -44,3 +50,23 @@ jobs:
           tag_name: ${{ github.ref_name }}
           files: release/*.tar.gz
           generate_release_notes: true
+
+      - name: Send notification email
+        if: always()
+        continue-on-error: true
+        uses: dawidd6/action-send-mail@v3
+        with:
+          server_address: ${{ env.CI_SMTP_HOST }}
+          server_port: ${{ env.CI_SMTP_PORT }}
+          username: ${{ env.CI_SMTP_USER }}
+          password: ${{ env.CI_SMTP_PASS }}
+          secure: true
+          subject: ${{ github.repository }} • ${{ github.workflow }} • ${{ job.status }}
+          to: ${{ env.CI_NOTIFY_EMAILS }}
+          from: ${{ env.CI_SMTP_USER }}
+          body: |
+            Workflow: ${{ github.workflow }}
+            Repository: ${{ github.repository }}
+            Ref: ${{ github.ref_name }}
+            Status: ${{ job.status }}
+            Run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}

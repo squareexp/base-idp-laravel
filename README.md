@@ -9,19 +9,14 @@ composer require squareexp/idp-laravel
 php artisan vendor:publish --tag=square-idp-config
 ```
 
-## Required Environment
+## Minimal Environment
 
 ```env
-BASE_IDP_ISSUER=https://authlayer.squareexp.com
 BASE_IDP_CLIENT_ID=<your-client-id>
 BASE_IDP_CLIENT_SECRET=<your-client-secret-if-confidential>
-BASE_IDP_REDIRECT_URI=<exact-registered-callback-url>
-BASE_IDP_SCOPES="openid profile <product>:read <product>:write"
-BASE_IDP_REQUIRED_SCOPE=<product>:read
-BASE_IDP_AUDIENCE=square-experience
 ```
 
-Get these values from Base client registration.
+That is enough for most Laravel apps. Base resolves redirect URIs, scopes, audience, and allowed auth methods from the client registration.
 Use `BASE_IDP_CLIENT_SECRET` for new projects; `BASE_IDP_SECRET` is kept as a legacy alias by older package versions.
 
 ## Login Redirect Route
