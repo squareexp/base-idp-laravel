@@ -54,3 +54,8 @@ use SquareExp\IdpLaravel\SquareIdpManager;
 $tokens = app(SquareIdpManager::class)->exchangeCode($code);
 $principal = app(SquareIdpManager::class)->verifyAccessToken($tokens['access_token'], 'crm:read');
 ```
+
+
+## Verification Support
+
+This SDK fully supports local validation of PASETO v4.public tokens using discovered and cached Ed25519 keys, ensuring secure offline checking of audience, issuer, expiry, and scopes.
